@@ -1,0 +1,193 @@
+<cms:php>
+    // Set info about selected folder
+    global $DB, $CTX, $FUNCS;
+    
+    $fid = ( isset($_GET['fid']) && $FUNCS->is_non_zero_natural($_GET['fid']) ) ? (int)$_GET['fid'] : null;
+    if( $fid ){
+        $rs = $DB->select( K_TBL_FOLDERS, array('name'), "id='" . $DB->sanitize( $fid ). "'" ); 
+        if( count($rs) ){
+            $fname = $rs[0]['name'];
+        }
+    }
+    
+    $CTX->set( 'my_selected_fid', $fid, 'global' );
+    $CTX->set( 'my_selected_fname', $fname, 'global' );
+</cms:php>
+
+<style>
+    /* In-page styles can be placed here */
+    table.listing td.comments-count {
+        padding-left: 4px;
+        text-align: left;
+    }
+</style>
+
+
+<cms:capture into='my_folders' scope='global'>
+    <cms:if k_folder_totalchildren >
+        <div class="bulk-actions">
+            
+            <cms:dropdownfolders masterpage=k_template_name prompt='View all folders' hierarchical='1' selected_id=my_selected_fid />
+            
+            <a class="button" id="btn_folder_submit" 
+                href="<cms:admin_link />" 
+                onclick="this.style.cursor='wait'; return false;" >
+                <span>Filter</span>
+            </a>
+            
+        </div>
+    </cms:if>
+</cms:capture> 
+   
+<cms:capture into='my_list' scope='global'>
+    <table class="listing clear" cellspacing="0" cellpadding="0">
+    
+        <thead>
+            <tr>
+                <th class="checkbox">
+                    <input type="checkbox" name="check-all" onclick="$$('.page-selector').set('checked', this.checked);">
+                </th>
+                
+                <!-- EDIT -->
+                <th>Screen Name</th>
+                <th>E-Mail</th>
+                <th>Folder</th>
+                <th>Join Date</th>
+                <th>Actions</th>
+                <!-- END EDIT -->
+                
+            </tr>
+        </thead>
+        
+        <tbody>    
+           
+            <cms:pages masterpage=k_template_name folder=my_selected_fname paginate='1' limit='15' show_unpublished='1' >
+
+                <cms:if k_paginated_bottom >
+                    <cms:if k_paginator_required >
+                        <cms:capture into='my_paginator' scope='global'>
+                            <cms:php>
+                                global $CTX, $FUNCS; 
+                                
+                                // Paginator assumes front-end template link as base. Make it point to the back-end.
+                                $pagination_link = $CTX->get( 'k_page_being_paginated' );
+                                $pagination_link = str_replace( $CTX->get('k_template_link'), $CTX->get('k_admin_link'), $pagination_link );
+                                $CTX->set( 'k_page_being_paginated', $pagination_link );
+                            </cms:php>
+                            <cms:paginator adjacents='2' />
+                            <div class="record-count">Showing <cms:show k_record_from />-<cms:show k_record_to /> / <cms:show k_total_records /></div>
+                        </cms:capture>    
+                    </cms:if>
+                    <cms:set row_class='last_row' />
+                </cms:if>
+                
+                <!-- EDIT -->
+                <tr>
+                    <td class="checkbox <cms:show row_class />">
+                        <input type="checkbox" value="<cms:show k_page_id />" class="page-selector" name="page-id[]">
+                    </td>
+
+                    <td class="name <cms:show row_class />">
+                        <a href="<cms:admin_link />" >
+                            <cms:excerpt count='48' truncate_chars='1'><cms:show k_page_title /></cms:excerpt>
+                        </a>
+                    </td>
+
+                    <td class="comments-count <cms:show row_class />"><cms:show member_email /></td>
+                    
+                    <td class="folder <cms:show row_class />"><cms:show k_ /></td>
+                    
+                    <td class="date <cms:show row_class />"><cms:if k_page_date=='0000-00-00 00:00:00' >Unpublished<cms:else /><cms:date k_page_date format='M jS Y' /></cms:if></td>
+                    
+                    <td class="actions <cms:show row_class />">
+                        <!-- edit -->
+                        <a href="<cms:admin_link />">
+                            <img src="<cms:show k_admin_link />theme/images/page_white_edit.gif" title="Edit">
+                        </a>
+                        
+                        <!-- delete -->
+                        <a href="<cms:admin_delete_link />" 
+                            onclick="if( confirm('Are you sure you want to delete page: <cms:show k_page_name />?') ) { return true; } return false;">
+                            <img src="<cms:show k_admin_link />theme/images/page_white_delete.gif" title="Delete">
+                        </a>
+                        
+                        <!-- view -->
+                        <a href="<cms:show k_page_link />" target="_blank" title="View">
+                            <img src="<cms:show k_admin_link />theme/images/magnifier.gif">
+                        </a>
+                    </td>
+                </tr>
+                 
+                <cms:no_results>
+                    <tr><td colspan="6" class="last_row" style="text-align:center">No pages found</td></tr>
+                </cms:no_results>
+                
+                <!-- END EDIT -->
+                
+            </cms:pages>
+        </tbody>
+    </table>
+</cms:capture>
+
+
+<form name="frm_list_pages" id="frm_list_pages" action="" method="post">
+
+    <div class="wrap-paginator">
+        <cms:show my_folders />
+        <cms:show my_paginator />
+    </div>
+
+    <div class="group-wrapper listing">
+        <cms:show my_list />
+    </div>
+
+    <div class="wrap-paginator">
+        <div class="bulk-actions">
+            <a class="button" id="btn_bulk_submit" href="#">
+                <span>Delete Selected</span>
+            </a>
+        </div>
+        
+        <cms:show my_paginator />
+    </div>
+    
+    <input type="hidden" id="nonce" name="nonce" value="<cms:php>global $FUNCS; echo $FUNCS->create_nonce( 'bulk_action_page' );</cms:php>">
+    <input type="hidden" id="bulk-action" name="bulk-action" value="delete">
+    
+</form>
+
+<script type="text/javascript">
+    //<![CDATA[
+    window.addEvent('domready', function(){
+        if( $('btn_folder_submit') ){
+            $('btn_folder_submit').addEvent('click', function(e){
+                var link = this.href
+                var fid = $('f_k_folders').value;
+                if( fid != -1 ){
+                    link += '&fid=' + fid;
+                }
+                document.location.href = link;
+            });
+        }
+    });
+    
+    function k_hook_bulk_submit(){
+        if( $('btn_bulk_submit') ){
+            $('btn_bulk_submit').addEvent('click', function(e){
+                var col = $$('.page-selector');
+                for( var x=0; x<col.length; x++ ){
+                    if( col[x].checked ){
+                        if( confirm('<cms:php> global $FUNCS; echo $FUNCS->t('confirm_delete_selected_pages'); </cms:php>') ){
+                            $$('body').setStyle('cursor', 'wait');
+                            $('frm_list_pages').submit();
+                        }
+                        return false;
+                    }
+                }
+                return false;
+                });
+        }
+    }
+    window.addEvent( 'domready', k_hook_bulk_submit );
+    //]]>
+</script>
